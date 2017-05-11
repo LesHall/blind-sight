@@ -7,64 +7,110 @@
 import processing.sound.*;
 
 
-String filename = "lena_thumb.jpg";
-int numSources = 2;
-float freqMax = 440.0;
-PImage img;
+
+String filename = "Sierpinski_carpet_6.svg.png";
+int numSources = 5;
+float freqMin = 100.0;
+float freqMax = 880.0;
+PImage img = createImage(512, 512, RGB);
 int iota;
 color lineColor = color(255, 0, 255);
+boolean fileAvailable = false;
+float[] sum = {0.0};
 
 
 
 SinOsc[] sine = {new SinOsc(this)};
+SinOsc scanLine = new SinOsc(this);
 
 
 
 void setup() {
   
-  size(512, 512);
-  frameRate(10);
+  size(256, 256);
      
-  // Create and start the sine oscillator.
+  // Create and start the sine oscillators
   sine[0] = new SinOsc(this);
-  for (int s = 1; s < numSources; ++s)
+  for (int s = 1; s < numSources; s++)
     sine = (SinOsc[]) append(sine, new SinOsc(this));
   
-  // Start the Sine Oscillator. 
-  for (int s = 1; s < numSources; ++s)
+  // Start the Sine Oscillators
+  for (int s = 0; s < numSources; s++)
     sine[s].play();
   
   // Set the pan of each oscillator
-  for (int s = 1; s < numSources; ++s)
-    sine[s].pan(float(s)/float(numSources-1));
- 
-  img = loadImage(filename);
-  img.resize(width, height);
-  img.loadPixels();
+  for (int s = 0; s < numSources; s++)
+    sine[s].pan(float(s)/float(numSources));
+  scanLine.pan(0.5);
   
-  iota = img.width/numSources;
+  // Set the amplitude of each oscillator
+  for (int s = 0; s < numSources; s++)
+    sine[s].amp(1.0/float(numSources));
+  scanLine.amp(1.0);
+
+  // initialize the sum array
+  for (int s = 1; s < numSources; s++)
+    sum = (float[]) append(sum, 0.0);
   
   stroke(lineColor);
   fill(lineColor);
+  
+  iota = width/numSources;
+  img = loadImage(filename);
+  img.resize(width, height);
+  img.loadPixels(); 
+  fileAvailable = false;
+
+  selectInput("Select a file to process:", "fileSelected");
 }
 
 
 
 void draw() {
-  background(0);
-  image(img, 0, 0);
+
+  int y = frameCount % height;  
+  scanLine.freq(float(y)/float(height));
   
-  int y = frameCount % img.height;
+  if (fileAvailable) {
+    
+    for (int s = 0; s < numSources; s++) {
+      
+      int x = s * iota;
+      for (int dx = 0; dx < iota; dx++)
+        sum[s] += brightness(img.pixels[y*width + x + dx]) / 256.0;
+      
+      if ((y % iota) == (iota -1)) {
+
+        float bright = sum[s] / iota / iota;
+        float frequency = freqMin + bright * (freqMax - freqMin);
   
-  for (int x = 0; x < img.width; x += iota) {
-    float sum = 0;
-    for (int dx = 0; dx < iota; ++dx)
-      sum += brightness(img.pixels[y*width + x + dx]) / 256.0;
-    float bright = sum / iota;
-    float frequency = bright * freqMax;
-    for (int s = 1; s < numSources; ++s)
-      sine[s].freq(frequency);
+        sine[s].freq(frequency);
+        
+        stroke(color(255*bright));
+        fill(color(255*bright));
+        rect(s*iota, y-iota, iota-1, iota);
+        
+        sum[s] = 0;
+      }
+    }
   }
   
-  line(0, y, width-1, y);
+  stroke(lineColor);
+  line(0, y, width, y);
+}
+
+
+
+
+void fileSelected(File selection) {
+  if (selection == null) {
+    println("Window was closed or the user hit cancel.");
+  } else {
+    println("User selected " + selection.getAbsolutePath());
+    filename = selection.getAbsolutePath();
+    img = loadImage(filename);
+    img.resize(width, height);
+    img.loadPixels(); 
+    fileAvailable = true;
+  }
 }
